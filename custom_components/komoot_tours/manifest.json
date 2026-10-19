@@ -1,0 +1,13 @@
+{
+  "domain": "komoot_tours",
+  "name": "Komoot Touren",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["http", "frontend", "panel_custom"],
+  "documentation": "https://github.com/hilde0407/Wanderintegration",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/hilde0407/Wanderintegration/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

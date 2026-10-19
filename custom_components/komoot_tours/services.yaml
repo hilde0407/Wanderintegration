@@ -1,0 +1,40 @@
+refresh:
+  fields:
+    config_entry:
+      required: false
+      selector:
+        config_entry:
+          integration: komoot_tours
+fetch_tracks:
+  fields:
+    config_entry:
+      required: false
+      selector:
+        config_entry:
+          integration: komoot_tours
+    force:
+      required: false
+      default: false
+      selector:
+        boolean:
+get_statistics:
+  fields:
+    config_entry:
+      required: false
+      selector:
+        config_entry:
+          integration: komoot_tours
+    year:
+      required: false
+      example: 2025
+      selector:
+        number:
+          min: 1990
+          max: 2100
+          mode: box
+    sport:
+      required: false
+      example: "hike"
+      selector:
+        text:
+          multiple: true

@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Komoot</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.21.0/dist/maplibre-gl.css"
+      integrity="sha384-MGCxhspF/+ufueUgol3FDkiAYQbpSNRhBT0VWHJt64U8qIy9qlnXWx8LAbj6niPH" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+      integrity="sha384-pmjIAcz2bAn0xukfxADbZIb3t8oRT9Sv0rvO+BR5Csr6Dhqq+nZs59P0pPKQJkEV" crossorigin="anonymous">
+<style>
+  :root {
+    --bg: #eef1ef; --panel: #ffffff; --chip: #ffffff; --fg: #1d2623; --muted: #5b6864; --line: #d4dbd8; --link: #2f6b4f;
+    --moss: #2f6b4f; --signal: #f2b705; --ink: #1b1b1b; --track: #d9480f;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; font: 14px/1.4 Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+         background: var(--bg); color: var(--fg); overflow: hidden; }
+  button { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  /* Kopfbereich: Ansicht, Jahr und Sportart */
+  header { flex: none; padding: 8px 12px 6px; display: grid; gap: 6px; background: var(--panel); box-shadow: 0 1px 0 var(--line); z-index: 1200; }
+  .row { display: flex; gap: 8px; align-items: center; min-width: 0; }
+  .tabs { display: flex; gap: 2px; flex: none; }
+  .tab { appearance: none; border: 0; background: none; cursor: pointer; padding: 6px 12px; font-weight: 600; border-radius: 6px 6px 0 0;
+         color: var(--muted); border-bottom: 3px solid transparent; }
+  .tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--signal); }
+  .tab:focus-visible, .sign:focus-visible, .sport:focus-visible, .reset:focus-visible { outline: 3px solid var(--moss); outline-offset: 1px; }
+  .grow { flex: 1; }
+  .meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  select.entry { background: var(--chip); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font: inherit; }
+
+  .strip { display: flex; gap: 6px; overflow-x: auto; padding: 2px 1px 4px; scrollbar-width: thin; }
+  .sign { flex: none; appearance: none; border: 0; cursor: pointer; font-weight: 600; padding: 6px 22px 6px 11px; background: var(--chip); color: var(--fg);
+          box-shadow: inset 0 0 0 1px var(--line);
+          clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%); }
+  .sign small { font-weight: 400; font-size: 12px; opacity: .72; margin-left: 5px; font-variant-numeric: tabular-nums; }
+  .sign[aria-pressed="true"] { background: var(--signal); color: var(--ink); }
+  .sport { flex: none; appearance: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px;
+           border: 1px solid var(--line); background: var(--chip); }
+  .sport i { width: 10px; height: 10px; border-radius: 50%; background: var(--c, var(--muted)); }
+  .sport small { opacity: .72; font-variant-numeric: tabular-nums; }
+  .sport[aria-pressed="true"] { background: var(--moss); border-color: var(--moss); color: #fff; }
+  .sport[aria-pressed="true"] i { box-shadow: 0 0 0 2px #fff; }
+  .reset { flex: none; appearance: none; border: 0; background: none; cursor: pointer; color: var(--link); font-weight: 600; padding: 4px 6px; }
+
+  main { position: relative; flex: 1; min-height: 0; }
+  .view { position: absolute; inset: 0; overflow: auto; }
+  #view-map { overflow: hidden; }
+  #map { position: absolute; inset: 0; background: var(--bg); }
+  .dark.raster .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.95) contrast(.9); }
+  .dark .leaflet-bar a { background: var(--chip); color: var(--fg); border-color: var(--line); }
+  .dark .leaflet-control-attribution { background: rgba(20, 25, 24, .82); color: var(--muted); }
+  .dark .leaflet-control-attribution a { color: var(--link); }
+
+  .sum { position: absolute; z-index: 1000; left: 10px; bottom: 24px; max-width: calc(100% - 96px); display: flex; flex-wrap: wrap; gap: 4px 20px;
+         padding: 9px 14px; border-radius: 6px; background: var(--panel); box-shadow: 0 0 0 1px var(--line), 0 1px 5px rgba(0,0,0,.35); }
+  .sum b { display: block; font-size: 21px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .sum span { font-size: 12px; color: var(--muted); }
+  .sum p { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--muted); }
+  .pin { width: 16px; height: 16px; border-radius: 50%; background: var(--c, var(--moss)); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+  .pin.latest { width: 24px; height: 24px; border-color: var(--ink); border-width: 3px; box-shadow: 0 0 0 3px var(--signal), 0 1px 4px rgba(0,0,0,.5); }
+  .cl span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--moss); color: #fff; border: 2px solid #fff;
+             font-weight: 700; font-size: 13px; box-shadow: 0 1px 4px rgba(0,0,0,.5); font-variant-numeric: tabular-nums; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--panel); color: var(--fg); }
+  .leaflet-container a.pop-link { color: var(--link); font-weight: 600; }
+  .pop h3 { margin: 0 0 2px; font-size: 15px; line-height: 1.25; }
+  .pop p { margin: 0 0 8px; color: var(--muted); }
+  .pop dl { display: flex; gap: 16px; margin: 0 0 8px; }
+  .pop dt { font-size: 11px; color: var(--muted); }
+  .pop dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* Statistik */
+  .page { max-width: 1100px; margin: 0 auto; padding: 14px 14px 40px; display: grid; gap: 22px; }
+  .kpis { display: flex; flex-wrap: wrap; gap: 6px 36px; }
+  .kpis b { display: block; font-size: 34px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .kpis span { color: var(--muted); }
+  h2 { margin: 0 0 8px; font-size: 16px; }
+  h2 small { font-weight: 400; color: var(--muted); margin-left: 6px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px 32px; }
+  .cols { display: flex; align-items: flex-end; gap: 4px; height: 150px; border-bottom: 1px solid var(--line); }
+  .col { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; appearance: none; border: 0; background: none; padding: 0; cursor: default; }
+  .col .bar { width: 100%; background: var(--moss); border-radius: 3px 3px 0 0; min-height: 1px; }
+  .col .val { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; margin-bottom: 2px; white-space: nowrap; }
+  .col.top .bar, .col.on .bar { background: var(--signal); }
+  .col.on .bar { box-shadow: 0 0 0 2px var(--ink); }
+  button.col { cursor: pointer; }
+  .labels { display: flex; gap: 4px; }
+  .labels span { flex: 1; text-align: center; font-size: 11px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: clip; white-space: nowrap; }
+  .labels span.on { color: var(--fg); font-weight: 700; }
+  .hbars { display: grid; gap: 7px; }
+  .hbar { display: grid; grid-template-columns: minmax(90px, 160px) 1fr auto; gap: 10px; align-items: center; }
+  .hbar .track { height: 14px; background: color-mix(in srgb, var(--line) 55%, transparent); border-radius: 3px; overflow: hidden; }
+  .hbar .fill { height: 100%; background: var(--c, var(--moss)); }
+  .hbar em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 12px; }
+  .records { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px 24px; margin: 0; padding: 0; list-style: none; }
+  .records li b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .records li span { color: var(--muted); font-size: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .records a { color: var(--link); }
+  svg.lines { width: 100%; height: auto; display: block; overflow: visible; }
+  svg.lines text { fill: var(--muted); font-size: 11px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 14px; height: 3px; margin-right: 5px; vertical-align: middle; background: var(--c); }
+
+  /* Tourenliste */
+  .tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .tools input { flex: 1; min-width: 160px; max-width: 360px; background: var(--chip); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font: inherit; }
+  .twrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td.name { white-space: normal; min-width: 180px; }
+  th { font-weight: 600; color: var(--muted); font-size: 12px; cursor: pointer; user-select: none; }
+  th[aria-sort] { color: var(--fg); }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  td a { color: var(--link); }
+  td button { appearance: none; border: 1px solid var(--line); background: var(--chip); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+  .more { justify-self: start; appearance: none; border: 1px solid var(--line); background: var(--chip); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+
+  .state { position: absolute; inset: 0; z-index: 1300; display: grid; place-items: center; padding: 24px; text-align: center; background: var(--bg); }
+  .state p { max-width: 42ch; margin: 0; color: var(--muted); font-size: 15px; }
+  .state strong { display: block; margin-bottom: 6px; color: var(--fg); font-size: 17px; }
+  .empty { color: var(--muted); padding: 24px 0; }
+</style>
+</head>
+<body>
+<header id="head" hidden>
+  <div class="row">
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <span class="grow"></span>
+    <select class="entry" id="entry" hidden aria-label="Konto"></select>
+    <span class="meta" id="meta"></span>
+  </div>
+  <div class="strip" id="years" aria-label="Jahr"></div>
+  <div class="strip" id="sports" aria-label="Sportart"></div>
+</header>
+<main id="main">
+  <section class="view" id="view-map" hidden>
+    <div id="map" role="application"></div>
+    <section class="sum" id="sum" aria-live="polite"></section>
+  </section>
+  <section class="view" id="view-stats" hidden><div class="page" id="stats"></div></section>
+  <section class="view" id="view-list" hidden><div class="page" id="list"></div></section>
+  <div class="state" id="state" role="status"><p>Lädt …</p></div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/maplibre-gl@5.21.0/dist/maplibre-gl.js"
+        integrity="sha384-Ws3wKfmCwrf1DlrykKbzQqYw4qv+2lCQfIJL/e7ug7Gaz2ACIYYy1R6E/rYG69f1" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"
+        integrity="sha384-tXYNKOHx4T02jMP7YYCtBxPIv1B5gaA5mcVPBzqMp6d7VzWzxJgI2aWF/nJLrQdS" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"
+        integrity="sha384-eXVCORTRlv4FUUgS/xmOyr66XBVraen8ATNLMESp92FKXLAMiKkerixTiBvXriZr" crossorigin="anonymous"></script>
+<script>
+(() => {
+  'use strict';
+  const API = '/api/komoot_tours';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  /* ---------- Sprache, Zahlen, Sportarten ---------- */
+  let lang = (navigator.language || 'de').slice(0, 2);
+  const T = {
+    de: { map: 'Karte', stats: 'Statistik', list: 'Touren', all: 'Alle', allSports: 'Alle Sportarten', tours: 'Touren', km: 'Kilometer', up: 'Höhenmeter', time: 'Zeit',
+          perYear: 'Kilometer pro Jahr', perMonth: 'Kilometer pro Monat', last12: 'letzte 12 Monate', bySport: 'Nach Sportart', records: 'Bestwerte', cumul: 'Jahresverlauf',
+          longest: 'Längste Tour', mostUp: 'Meiste Höhenmeter', longestTime: 'Längste Dauer', bestMonth: 'Stärkster Monat', bestYear: 'Stärkstes Jahr', avg: 'Durchschnitt je Tour',
+          date: 'Datum', tour: 'Tour', sport: 'Sportart', dur: 'Dauer', openKomoot: 'Bei Komoot öffnen', distance: 'Strecke', ascent: 'Aufstieg', duration: 'Dauer',
+          search: 'Tour suchen …', showMore: 'Mehr anzeigen', onMap: 'Karte', reset: 'Filter zurücksetzen', noTours: 'Keine Touren für diese Auswahl.',
+          noStart: 'ohne Startpunkt, nicht auf der Karte', routes: 'Routen', loadedOf: 'geladen', rest: 'der Rest folgt im Hintergrund', updated: 'Stand',
+          loadErr: 'Daten konnten nicht geladen werden', noHa: 'Diese Seite muss innerhalb von Home Assistant geöffnet werden (Seitenleiste „Komoot“ oder Dashboard-Karte „Webseite“).',
+          noEntry: 'Es ist noch kein Komoot-Konto eingerichtet. Unter Einstellungen → Geräte & Dienste → Integration hinzufügen → „Komoot Touren“.',
+          noLib: 'Die Kartenbibliothek konnte nicht geladen werden. Die Karte braucht Internetzugang (unpkg.com).', months: ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'],
+          sports: { hike: 'Wandern', mountaineering: 'Bergsteigen', snowshoe: 'Schneeschuh', jogging: 'Laufen', racebike: 'Rennrad', e_racebike: 'E-Rennrad', touringbicycle: 'Radtour', e_touringbicycle: 'E-Radtour',
+                    citybike: 'Stadtrad', mtb: 'Mountainbike', mtb_easy: 'MTB leicht', mtb_advanced: 'MTB schwer', e_mtb: 'E-MTB', e_mtb_easy: 'E-MTB leicht', e_mtb_advanced: 'E-MTB schwer',
+                    downhillbike: 'Downhill', gravelbike: 'Gravelbike', skialpin: 'Skifahren', skitour: 'Skitour', nordic: 'Langlauf', climbing: 'Klettern', inlineskates: 'Inlineskaten',
+                    kayaking: 'Kajak', canoe: 'Kanu', sup: 'SUP', sailing: 'Segeln', unicycle: 'Einrad', other: 'Andere', unknown: 'Unbekannt' } },
+    en: { map: 'Map', stats: 'Statistics', list: 'Tours', all: 'All', allSports: 'All sports', tours: 'Tours', km: 'Kilometres', up: 'Ascent (m)', time: 'Time',
+          perYear: 'Kilometres per year', perMonth: 'Kilometres per month', last12: 'last 12 months', bySport: 'By sport', records: 'Records', cumul: 'Year progress',
+          longest: 'Longest tour', mostUp: 'Most ascent', longestTime: 'Longest duration', bestMonth: 'Best month', bestYear: 'Best year', avg: 'Average per tour',
+          date: 'Date', tour: 'Tour', sport: 'Sport', dur: 'Duration', openKomoot: 'Open on Komoot', distance: 'Distance', ascent: 'Ascent', duration: 'Duration',
+          search: 'Search tours …', showMore: 'Show more', onMap: 'Map', reset: 'Reset filters', noTours: 'No tours for this selection.',
+          noStart: 'without start point, not on the map', routes: 'Routes', loadedOf: 'loaded', rest: 'the rest follows in the background', updated: 'Updated',
+          loadErr: 'Could not load data', noHa: 'This page has to be opened inside Home Assistant (sidebar “Komoot” or a webpage dashboard card).',
+          noEntry: 'No Komoot account is set up yet. Settings → Devices & services → Add integration → “Komoot Touren”.',
+          noLib: 'The map library could not be loaded. The map needs internet access (unpkg.com).', months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+          sports: { hike: 'Hiking', mountaineering: 'Mountaineering', snowshoe: 'Snowshoeing', jogging: 'Running', racebike: 'Road cycling', e_racebike: 'E-road cycling', touringbicycle: 'Bike touring',
+                    e_touringbicycle: 'E-bike touring', citybike: 'City bike', mtb: 'Mountain biking', mtb_easy: 'MTB easy', mtb_advanced: 'MTB advanced', e_mtb: 'E-MTB', e_mtb_easy: 'E-MTB easy',
+                    e_mtb_advanced: 'E-MTB advanced', downhillbike: 'Downhill', gravelbike: 'Gravel', skialpin: 'Alpine skiing', skitour: 'Ski touring', nordic: 'Cross-country', climbing: 'Climbing',
+                    inlineskates: 'Inline skating', kayaking: 'Kayaking', canoe: 'Canoeing', sup: 'SUP', sailing: 'Sailing', unicycle: 'Unicycle', other: 'Other', unknown: 'Unknown' } },
+  };
+  const tr = () => T[lang] || T.en;
+  const sportName = (k) => tr().sports[k] || k;
+  let nf0, nf1;
+  const setLocale = () => {
+    nf0 = new Intl.NumberFormat(lang === 'de' ? 'de-DE' : lang, { maximumFractionDigits: 0 });
+    nf1 = new Intl.NumberFormat(lang === 'de' ? 'de-DE' : lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  };
+  setLocale();
+  const dur = (min) => (!min ? '–' : min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min`);
+  const hours = (min) => `${nf0.format(Math.floor(min / 60))} h`;
+  const day = (s) => { const [y, m, d] = s.slice(0, 10).split('-').map(Number); return new Intl.DateTimeFormat(lang === 'de' ? 'de-DE' : lang, { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(y, m - 1, d)); };
+  const dayShort = (s) => { const [y, m, d] = s.slice(0, 10).split('-'); return lang === 'de' ? `${d}.${m}.${y}` : `${y}-${m}-${d}`; };
+
+  // Farbenblind-taugliche Palette (Okabe/Ito); weitere Sportarten bekommen Grau
+  const PALETTE = ['#0072B2', '#E69F00', '#009E73', '#D55E00', '#CC79A7', '#56B4E9', '#8c7b00', '#6a3d9a'];
+
+  /* ---------- Zustand ---------- */
+  const store = {
+    get: (k) => { try { return JSON.parse(localStorage.getItem('komoot_' + k)); } catch (e) { return null; } },
+    set: (k, v) => { try { localStorage.setItem('komoot_' + k, JSON.stringify(v)); } catch (e) { /* ohne Speicher weiter */ } },
+  };
+  const S = { entry: null, tours: [], meta: {}, years: [], sportList: [], colors: {}, year: 'all', sports: new Set(), tab: 'map', tracks: {}, trackAsked: new Set(), sortKey: 'date', sortDir: -1, listLimit: 100, q: '' };
+
+  /* ---------- Theme aus Home Assistant uebernehmen ---------- */
+  function haRoot() { try { return window.parent !== window ? window.parent.document.documentElement : null; } catch (e) { return null; } }
+  function luminance(value) {
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.fillStyle = '#000'; ctx.fillStyle = value; ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  }
+  function applyTheme() {
+    const root = haRoot();
+    const host = root ? window.parent.getComputedStyle(root) : null;
+    const get = (n) => (host ? host.getPropertyValue(n).trim() : '');
+    let dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const bg = get('--primary-background-color');
+    if (bg) { try { dark = luminance(bg) < 0.5; } catch (e) { /* Standard */ } }
+    const f = dark ? { bg: '#111414', panel: '#1c2120', fg: '#e6ece9', muted: '#9aa8a3', line: '#33403c', link: '#7fd1a6' } : { bg: '#eef1ef', panel: '#ffffff', fg: '#1d2623', muted: '#5b6864', line: '#d4dbd8', link: '#2f6b4f' };
+    const set = (k, v) => document.documentElement.style.setProperty(k, v);
+    set('--bg', get('--primary-background-color') || f.bg);
+    set('--panel', get('--card-background-color') || f.panel);
+    set('--chip', dark ? '#2a3331' : (get('--card-background-color') || f.panel));
+    set('--fg', get('--primary-text-color') || f.fg);
+    set('--muted', get('--secondary-text-color') || f.muted);
+    set('--line', get('--divider-color') || f.line);
+    set('--link', f.link);
+    set('--track', dark ? '#f2b705' : '#d9480f');
+    document.documentElement.classList.toggle('dark', dark);
+  }
+
+  /* ---------- Daten laden (authentifiziert ueber Home Assistant) ---------- */
+  function hassFetch(url) {
+    let ha = null;
+    try { ha = window.parent.document.querySelector('home-assistant'); } catch (e) { /* kein Zugriff */ }
+    const hass = ha && ha.hass;
+    if (!hass || !hass.fetchWithAuth) return Promise.reject(new Error('NO_HA'));
+    return hass.fetchWithAuth(url).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
+  }
+  const say = (title, text) => { const s = $('state'); s.hidden = false; s.innerHTML = `<p><strong>${esc(title)}</strong>${esc(text)}</p>`; };
+
+  async function boot() {
+    applyTheme();
+    try {
+      const e = await waitFor(() => hassFetch(`${API}/entries`));
+      lang = (e.language || lang).slice(0, 2); setLocale();
+      if (!e.entries.length) return say('Komoot', tr().noEntry);
+      const saved = store.get('entry');
+      S.entries = e.entries;
+      S.entry = (e.entries.find((x) => x.entry_id === saved) || e.entries[0]).entry_id;
+      await load();
+    } catch (err) {
+      if (err.message === 'NO_HA') say('Komoot', tr().noHa); else say(tr().loadErr, err.message);
+    }
+  }
+  // Beim Start ist hass im Elternfenster manchmal noch nicht bereit
+  async function waitFor(fn, tries = 25) {
+    for (let i = 0; ; i++) {
+      try { return await fn(); } catch (e) { if (e.message !== 'NO_HA' || i >= tries) throw e; await new Promise((r) => setTimeout(r, 200)); }
+    }
+  }
+
+  async function load() {
+    const d = await hassFetch(`${API}/${S.entry}/tours`);
+    S.meta = d;
+    S.tours = d.tours;
+    S.years = [...new Set(S.tours.map((t) => t.date.slice(0, 4)))].sort().reverse();
+    const counts = {};
+    S.tours.forEach((t) => { counts[t.sport] = (counts[t.sport] || 0) + 1; });
+    S.sportList = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    S.sportCounts = counts;
+    S.colors = {};
+    S.sportList.forEach((k, i) => { S.colors[k] = PALETTE[i] || '#7a8480'; });
+    if (!S.restored) {
+      S.restored = true;
+      const st = store.get('state') || {};
+      if (st.year && (st.year === 'all' || S.years.includes(st.year))) S.year = st.year; else S.year = S.years[0] || 'all';
+      S.sports = new Set((st.sports || []).filter((k) => counts[k]));
+      if (['map', 'stats', 'list'].includes(st.tab)) S.tab = st.tab;
+    }
+    $('state').hidden = true;
+    $('head').hidden = false;
+    buildHeader();
+    render();
+  }
+
+  /* ---------- Auswahl ---------- */
+  const inSports = (t) => !S.sports.size || S.sports.has(t.sport);
+  const inYear = (t) => S.year === 'all' || t.date.startsWith(S.year);
+  const sel = () => S.tours.filter((t) => inSports(t) && inYear(t));
+  const selAllYears = () => S.tours.filter(inSports);
+  const sum = (a, k) => a.reduce((s, t) => s + t[k], 0);
+  const save = () => store.set('state', { year: S.year, sports: [...S.sports], tab: S.tab });
+
+  function buildHeader() {
+    const t = tr();
+    $('tabs').innerHTML = ['map', 'stats', 'list'].map((k) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${S.tab === k}">${t[k]}</button>`).join('');
+    const ent = $('entry');
+    ent.hidden = S.entries.length < 2;
+    ent.innerHTML = S.entries.map((e) => `<option value="${esc(e.entry_id)}"${e.entry_id === S.entry ? ' selected' : ''}>${esc(e.title)}</option>`).join('');
+    const upd = new Date(S.meta.updated);
+    $('meta').textContent = `${t.updated} ${upd.toLocaleString(lang === 'de' ? 'de-DE' : lang, { dateStyle: 'short', timeStyle: 'short' })}`;
+    refreshChips();
+  }
+
+  function refreshChips() {
+    const t = tr();
+    const base = S.tours.filter(inSports);
+    $('years').innerHTML = [['all', t.all, base.length], ...S.years.map((y) => [y, y, base.filter((x) => x.date.startsWith(y)).length])]
+      .map(([v, label, n]) => `<button class="sign" type="button" data-year="${v}" aria-pressed="${S.year === v}">${label}<small>${n}</small></button>`).join('');
+    const byYear = S.tours.filter(inYear);
+    const cnt = {}; byYear.forEach((x) => { cnt[x.sport] = (cnt[x.sport] || 0) + 1; });
+    $('sports').innerHTML = (S.sports.size ? `<button class="reset" type="button" data-reset="1">${t.reset}</button>` : '')
+      + S.sportList.map((k) => `<button class="sport" type="button" data-sport="${esc(k)}" aria-pressed="${S.sports.has(k)}" style="--c:${S.colors[k]}"><i></i>${esc(sportName(k))}<small>${cnt[k] || 0}</small></button>`).join('');
+  }
+
+  $('tabs').addEventListener('click', (e) => { const b = e.target.closest('.tab'); if (b) setTab(b.dataset.tab); });
+  $('years').addEventListener('click', (e) => { const b = e.target.closest('.sign'); if (b) { S.year = b.dataset.year; changed(); } });
+  $('sports').addEventListener('click', (e) => {
+    const r = e.target.closest('.reset'); if (r) { S.sports.clear(); return changed(); }
+    const b = e.target.closest('.sport'); if (!b) return;
+    const k = b.dataset.sport;
+    if (S.sports.has(k)) S.sports.delete(k); else S.sports.add(k);
+    changed();
+  });
+  $('entry').addEventListener('change', async (e) => { S.entry = e.target.value; store.set('entry', S.entry); S.tracks = {}; S.trackAsked = new Set(); await load(); });
+  function setTab(k) { S.tab = k; document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === k))); save(); render(); }
+  function changed() { save(); S.listLimit = 100; refreshChips(); render(); }
+
+  function render() {
+    ['map', 'stats', 'list'].forEach((k) => { $('view-' + k).hidden = S.tab !== k; });
+    if (S.tab === 'map') renderMap(); else if (S.tab === 'stats') renderStats(); else renderList();
+  }
+
+  /* ---------- Karte ---------- */
+  let map, cluster, lines, base, mapReady = false, lineById = {};
+  const popup = (t) => `<div class="pop"><h3>${esc(t.name || '–')}</h3><p>${day(t.date)} · ${esc(sportName(t.sport))}</p>
+    <dl><div><dt>${tr().distance}</dt><dd>${nf1.format(t.km)} km</dd></div><div><dt>${tr().duration}</dt><dd>${dur(t.min)}</dd></div><div><dt>${tr().ascent}</dt><dd>${nf0.format(t.up)} m</dd></div></dl>
+    <a class="pop-link" href="https://www.komoot.com/tour/${encodeURIComponent(t.id)}" target="_blank" rel="noopener">${tr().openKomoot}</a></div>`;
+
+  function initMap() {
+    if (mapReady) return true;
+    if (!window.L) { say('Komoot', tr().noLib); return false; }
+    mapReady = true;
+    map = L.map('map', { zoomControl: false, worldCopyJump: true, preferCanvas: true, maxZoom: 19, minZoom: 3 });
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    const attr = '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener">Fix the map</a>';
+    const raster = () => {
+      if (base) map.removeLayer(base);
+      document.documentElement.classList.add('raster');
+      base = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, subdomains: 'abc',
+        attribution: 'Kartendaten © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>, SRTM | © <a href="https://opentopomap.org" target="_blank" rel="noopener">OpenTopoMap</a> (CC-BY-SA)' }).addTo(map);
+    };
+    try {
+      if (window.maplibregl && L.maplibreGL) {
+        const dark = document.documentElement.classList.contains('dark');
+        const style = new URL(dark ? 'style-dunkel.json' : 'style-hell.json', window.location.href).href;
+        base = L.maplibreGL({ style, attribution: attr, interactive: false }).addTo(map);
+        let errs = 0; base.getMaplibreMap().on('error', () => { if (++errs === 5) raster(); });
+      } else raster();
+    } catch (e) { raster(); }
+    cluster = L.markerClusterGroup({ maxClusterRadius: 36, showCoverageOnHover: false, iconCreateFunction: (c) => L.divIcon({ html: `<span>${c.getChildCount()}</span>`, className: 'cl', iconSize: [34, 34] }) });
+    map.addLayer(cluster);
+    lines = L.layerGroup().addTo(map);
+    return true;
+  }
+
+  let lastFit = '';
+  function renderMap() {
+    if (!initMap()) return;
+    map.invalidateSize();
+    const tours = sel();
+    const located = tours.filter((t) => t.lat != null && t.lng != null);
+    const latest = S.tours.filter((t) => t.lat != null).reduce((a, b) => (!a || b.date > a.date ? b : a), null);
+    cluster.clearLayers();
+    cluster.addLayers(located.map((t) => {
+      const isLatest = latest && t.id === latest.id; const size = isLatest ? 24 : 16;
+      return L.marker([t.lat, t.lng], {
+        icon: L.divIcon({ html: '', className: 'pin' + (isLatest ? ' latest' : ''), iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2] }),
+        title: `${t.name}, ${dayShort(t.date)}`, zIndexOffset: isLatest ? 1000 : 0,
+      }).bindPopup(popup(t), { maxWidth: 280 }).on('add', (ev) => { ev.target._icon && ev.target._icon.style.setProperty('--c', S.colors[t.sport] || '#2f6b4f'); });
+    }));
+    drawLines(tours);
+    const fitKey = `${S.year}|${[...S.sports].sort()}|${S.entry}`;
+    if (fitKey !== lastFit) {
+      lastFit = fitKey;
+      const pts = located.map((t) => [t.lat, t.lng]);
+      if (pts.length === 1) map.setView(pts[0], 12);
+      else if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: 13 });
+      else map.setView([50.5, 10.5], 5);
+    }
+    const km = sum(tours, 'km'), up = sum(tours, 'up');
+    const withTrack = tours.filter((t) => t.track);
+    const drawn = tours.filter((t) => S.tracks[t.id]).length;
+    const noStart = tours.length - located.length;
+    $('sum').innerHTML = `<div><b>${nf0.format(tours.length)}</b><span>${tr().tours}</span></div><div><b>${nf0.format(km)}</b><span>${tr().km}</span></div><div><b>${nf0.format(up)}</b><span>${tr().up}</span></div>`
+      + (noStart ? `<p>${noStart} ${tr().noStart}</p>` : '')
+      + (S.meta.tracks_loaded < S.meta.tracks_total ? `<p>${tr().routes}: ${nf0.format(S.meta.tracks_loaded)} / ${nf0.format(S.meta.tracks_total)} ${tr().loadedOf}, ${tr().rest}</p>` : '')
+      ;
+    fetchTracks(withTrack);
+  }
+
+  function drawLines(tours) {
+    lines.clearLayers(); lineById = {};
+    tours.forEach((t) => {
+      const tr_ = S.tracks[t.id];
+      if (!tr_ || tr_.length < 2) return;
+      const color = S.sports.size === 1 || S.sportList.length < 2 ? getComputedStyle(document.documentElement).getPropertyValue('--track').trim() : (S.colors[t.sport] || '#7a8480');
+      const line = L.polyline(tr_, { color, weight: 3, opacity: .85, lineJoin: 'round' }).bindPopup(popup(t), { maxWidth: 280 });
+      line.on('popupopen', () => line.setStyle({ weight: 6, opacity: 1 }).bringToFront());
+      line.on('popupclose', () => line.setStyle({ weight: 3, opacity: .85 }));
+      lines.addLayer(line); lineById[t.id] = line;
+    });
+  }
+
+  let fetching = false;
+  async function fetchTracks(tours) {
+    const missing = tours.filter((t) => !S.tracks[t.id] && !S.trackAsked.has(t.id)).map((t) => t.id);
+    if (!missing.length || fetching) return;
+    fetching = true;
+    const entry = S.entry;
+    try {
+      for (let i = 0; i < missing.length; i += 40) {
+        const chunk = missing.slice(i, i + 40);
+        chunk.forEach((id) => S.trackAsked.add(id));
+        const got = await hassFetch(`${API}/${entry}/tracks?ids=${chunk.join(',')}`);
+        if (entry !== S.entry) break;
+        Object.assign(S.tracks, got);
+        if (S.tab === 'map') drawLines(sel());
+      }
+    } catch (e) { /* naechster Versuch bei der naechsten Aktualisierung */ }
+    fetching = false;
+  }
+
+  function focusTour(t) {
+    S.tab = 'map'; setTab('map');
+    if (t.lat == null) return;
+    const open = () => {
+      map.setView([t.lat, t.lng], 13);
+      const ln = lineById[t.id];
+      if (ln) { ln.openPopup(ln.getBounds().getCenter()); } else L.popup({ maxWidth: 280 }).setLatLng([t.lat, t.lng]).setContent(popup(t)).openOn(map);
+    };
+    setTimeout(open, 60);
+  }
+
+  /* ---------- Statistik ---------- */
+  function cols(items, opts = {}) {
+    const max = Math.max(1, ...items.map((i) => i.value));
+    const topIdx = opts.noTop ? -1 : items.reduce((b, it, i) => (it.value > (items[b] ? items[b].value : -1) ? i : b), 0);
+    const col = items.map((it, i) => {
+      const cls = ['col', it.on ? 'on' : '', i === topIdx && it.value > 0 ? 'top' : ''].join(' ');
+      const inner = `<span class="val">${it.value ? nf0.format(it.value) : ''}</span><span class="bar" style="height:${Math.round((it.value / max) * 100 * 0.86)}%"></span>`;
+      return it.onclick ? `<button type="button" class="${cls}" data-v="${esc(it.key)}" title="${esc(it.title || '')}">${inner}</button>` : `<div class="${cls}" title="${esc(it.title || '')}">${inner}</div>`;
+    }).join('');
+    const lab = items.map((it) => `<span class="${it.on ? 'on' : ''}">${esc(it.label)}</span>`).join('');
+    return `<div class="cols">${col}</div><div class="labels">${lab}</div>`;
+  }
+
+  function renderStats() {
+    const t = tr();
+    const tours = sel();
+    const all = selAllYears();
+    const el = $('stats');
+    if (!S.tours.length) { el.innerHTML = `<p class="empty">${t.noTours}</p>`; return; }
+
+    // Kennzahlen
+    const km = sum(tours, 'km'), up = sum(tours, 'up'), min = sum(tours, 'min');
+    let html = `<div class="kpis"><div><b>${nf0.format(tours.length)}</b><span>${t.tours}</span></div><div><b>${nf0.format(km)}</b><span>${t.km}</span></div>
+      <div><b>${nf0.format(up)}</b><span>${t.up}</span></div><div><b>${hours(min)}</b><span>${t.time}</span></div></div>`;
+    if (!tours.length) { el.innerHTML = html + `<p class="empty">${t.noTours}</p>`; return; }
+
+    // Pro Jahr
+    const yearsAsc = [...S.years].reverse();
+    const yItems = yearsAsc.map((y) => { const a = all.filter((x) => x.date.startsWith(y)); return { key: y, label: y, value: Math.round(sum(a, 'km')), on: S.year === y, onclick: true, title: `${y}: ${nf1.format(sum(a, 'km'))} km, ${a.length} ${t.tours}` }; });
+
+    // Pro Monat: gewaehltes Jahr oder letzte 12 Monate
+    let mItems = [];
+    let mTitle = t.perMonth;
+    if (S.year !== 'all') {
+      mTitle += ` ${S.year}`;
+      for (let m = 1; m <= 12; m++) { const key = `${S.year}-${String(m).padStart(2, '0')}`; const a = tours.filter((x) => x.date.startsWith(key)); mItems.push({ key, label: t.months[m - 1], value: Math.round(sum(a, 'km')), title: `${t.months[m - 1]} ${S.year}: ${nf1.format(sum(a, 'km'))} km, ${a.length}` }); }
+    } else {
+      mTitle += ` (${t.last12})`;
+      const last = tours[0].date; let y = +last.slice(0, 4), m = +last.slice(5, 7); const keys = [];
+      for (let i = 0; i < 12; i++) { keys.unshift([y, m]); m--; if (m === 0) { m = 12; y--; } }
+      mItems = keys.map(([yy, mm]) => { const key = `${yy}-${String(mm).padStart(2, '0')}`; const a = tours.filter((x) => x.date.startsWith(key)); return { key, label: t.months[mm - 1], value: Math.round(sum(a, 'km')), title: `${t.months[mm - 1]} ${yy}: ${nf1.format(sum(a, 'km'))} km, ${a.length}` }; });
+    }
+
+    // Nach Sportart (Auswahl)
+    const bySport = {}; tours.forEach((x) => { const e = bySport[x.sport] || (bySport[x.sport] = { n: 0, km: 0, up: 0 }); e.n++; e.km += x.km; e.up += x.up; });
+    const sKeys = Object.keys(bySport).sort((a, b) => bySport[b].km - bySport[a].km);
+    const sMax = Math.max(1, ...sKeys.map((k) => bySport[k].km));
+    const sHtml = sKeys.map((k) => `<div class="hbar"><span>${esc(sportName(k))}</span><div class="track"><div class="fill" style="width:${(bySport[k].km / sMax) * 100}%;--c:${S.colors[k]}"></div></div><em>${nf0.format(bySport[k].km)} km · ${bySport[k].n}×</em></div>`).join('');
+
+    // Bestwerte
+    const best = (key) => tours.reduce((a, b) => (b[key] > a[key] ? b : a));
+    const lt = best('km'), mu = best('up'), ld = best('min');
+    const mon = {}; tours.forEach((x) => { const k = x.date.slice(0, 7); mon[k] = (mon[k] || 0) + x.km; });
+    const bm = Object.keys(mon).reduce((a, b) => (mon[b] > mon[a] ? b : a));
+    const yr = {}; all.forEach((x) => { const k = x.date.slice(0, 4); yr[k] = (yr[k] || 0) + x.km; });
+    const by = Object.keys(yr).reduce((a, b) => (yr[b] > yr[a] ? b : a));
+    const link = (x) => `<a href="https://www.komoot.com/tour/${encodeURIComponent(x.id)}" target="_blank" rel="noopener">${esc(x.name || '–')}</a>, ${dayShort(x.date)}`;
+    const rec = `<ul class="records">
+      <li><b>${nf1.format(lt.km)} km</b><span>${t.longest}: ${link(lt)}</span></li>
+      <li><b>${nf0.format(mu.up)} m</b><span>${t.mostUp}: ${link(mu)}</span></li>
+      <li><b>${dur(ld.min)}</b><span>${t.longestTime}: ${link(ld)}</span></li>
+      <li><b>${nf0.format(mon[bm])} km</b><span>${t.bestMonth}: ${t.months[+bm.slice(5) - 1]} ${bm.slice(0, 4)}</span></li>
+      <li><b>${nf0.format(yr[by])} km</b><span>${t.bestYear}: ${by}</span></li>
+      <li><b>${nf1.format(km / tours.length)} km</b><span>${t.avg}, ${nf0.format(up / tours.length)} m ${lang === 'de' ? 'Aufstieg' : 'ascent'}</span></li></ul>`;
+
+    html += `<div class="grid2"><section><h2>${t.perYear}</h2>${cols(yItems, { noTop: true })}</section><section><h2>${mTitle}</h2>${cols(mItems)}</section></div>
+      <section><h2>${t.cumul}<small>${t.km}</small></h2><div id="cumul"></div></section>
+      <div class="grid2"><section><h2>${t.bySport}</h2><div class="hbars">${sHtml}</div></section><section><h2>${t.records}</h2>${rec}</section></div>`;
+    el.innerHTML = html;
+    el.querySelectorAll('button.col').forEach((b) => b.addEventListener('click', () => { S.year = S.year === b.dataset.v ? 'all' : b.dataset.v; changed(); }));
+    cumulative($('cumul'), all);
+  }
+
+  // Kumulierte Kilometer je Jahr (Monatsende) als Linien, ausgewaehltes Jahr hervorgehoben
+  function cumulative(el, all) {
+    const W = Math.max(320, Math.round(el.clientWidth || 640)), H = Math.round(Math.min(300, Math.max(190, W * 0.34)));
+    const L0 = 44, R0 = 44, T0 = 10, B0 = 24;
+    const years = [...S.years].slice(0, 7).reverse();
+    const now = new Date(); const curY = String(now.getFullYear());
+    const series = years.map((y) => {
+      const pts = []; let c = 0;
+      const endM = y === curY ? now.getMonth() + 1 : 12;
+      for (let m = 1; m <= endM; m++) { c += sum(all.filter((x) => x.date.startsWith(`${y}-${String(m).padStart(2, '0')}`)), 'km'); pts.push(c); }
+      return { y, pts };
+    });
+    const max = Math.max(1, ...series.map((s) => s.pts[s.pts.length - 1] || 0));
+    const sx = (m) => L0 + (m / 11) * (W - L0 - R0), sy = (v) => T0 + (1 - v / max) * (H - T0 - B0);
+    const hi = S.year !== 'all' ? S.year : curY;
+    let svg = `<svg class="lines" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${tr().cumul}">`;
+    for (let i = 0; i <= 4; i++) { const v = (max / 4) * i; svg += `<line x1="${L0}" x2="${W - R0}" y1="${sy(v)}" y2="${sy(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L0 - 6}" y="${sy(v) + 4}" text-anchor="end">${nf0.format(v)}</text>`; }
+    tr().months.forEach((m, i) => { if (W > 480 || i % 2 === 0) svg += `<text x="${sx(i)}" y="${H - 6}" text-anchor="middle">${m}</text>`; });
+    const ordered = series.filter((s) => s.y !== hi).concat(series.filter((s) => s.y === hi));
+    ordered.forEach((s) => {
+      if (!s.pts.length) return;
+      const on = s.y === hi;
+      const d = s.pts.map((v, i) => `${i ? 'L' : 'M'}${sx(i).toFixed(1)},${sy(v).toFixed(1)}`).join('');
+      svg += `<path d="${d}" fill="none" stroke="${on ? 'var(--signal)' : 'var(--muted)'}" stroke-opacity="${on ? 1 : .45}" stroke-width="${on ? 4 : 1.6}" stroke-linejoin="round" stroke-linecap="round"/>`;
+    });
+    // Jahreszahlen am Linienende, ohne sich zu ueberdecken
+    const ends = series.filter((s) => s.pts.length).map((s) => ({ y: s.y, x: sx(s.pts.length - 1) + 5, ty: sy(s.pts[s.pts.length - 1]) + 4, on: s.y === hi }));
+    ends.sort((a, b) => a.ty - b.ty);
+    for (let i = 1; i < ends.length; i++) if (ends[i].ty - ends[i - 1].ty < 13) ends[i].ty = ends[i - 1].ty + 13;
+    ends.forEach((e) => { svg += `<text x="${Math.min(e.x, W - 30)}" y="${e.ty}" ${e.on ? 'style="fill:var(--fg);font-weight:700"' : ''}>${e.y}</text>`; });
+    el.innerHTML = svg + '</svg>';
+  }
+
+  /* ---------- Tourenliste ---------- */
+  function renderList() {
+    const t = tr();
+    const el = $('list');
+    let rows = sel();
+    const q = S.q.trim().toLowerCase();
+    if (q) rows = rows.filter((x) => x.name.toLowerCase().includes(q));
+    const key = S.sortKey, dir = S.sortDir;
+    rows = [...rows].sort((a, b) => (typeof a[key] === 'string' ? a[key].localeCompare(b[key]) : a[key] - b[key]) * dir || String(b.id).localeCompare(String(a.id)));
+    const head = (k, label, n) => `<th class="${n ? 'n' : ''}" data-k="${k}" ${S.sortKey === k ? `aria-sort="${S.sortDir > 0 ? 'ascending' : 'descending'}"` : ''}>${label}${S.sortKey === k ? (S.sortDir > 0 ? ' ▲' : ' ▼') : ''}</th>`;
+    const shown = rows.slice(0, S.listLimit);
+    el.innerHTML = `<div class="tools"><input id="q" type="search" placeholder="${t.search}" value="${esc(S.q)}" aria-label="${t.search}"><span class="meta">${nf0.format(rows.length)} ${t.tours} · ${nf0.format(sum(rows, 'km'))} km</span></div>`
+      + (rows.length ? `<div class="twrap"><table><thead><tr>${head('date', t.date)}${head('name', t.tour)}${head('sport', t.sport)}${head('km', 'km', 1)}${head('min', t.dur, 1)}${head('up', '↑ m', 1)}<th></th></tr></thead><tbody>`
+        + shown.map((x) => `<tr><td>${dayShort(x.date)}</td><td class="name"><a href="https://www.komoot.com/tour/${encodeURIComponent(x.id)}" target="_blank" rel="noopener">${esc(x.name || '–')}</a></td>
+          <td>${esc(sportName(x.sport))}</td><td class="n">${nf1.format(x.km)}</td><td class="n">${dur(x.min)}</td><td class="n">${nf0.format(x.up)}</td>
+          <td>${x.lat != null ? `<button type="button" data-id="${esc(x.id)}">${t.onMap}</button>` : ''}</td></tr>`).join('')
+        + `</tbody></table></div>` + (rows.length > shown.length ? `<button class="more" type="button" id="more">${t.showMore}</button>` : '') : `<p class="empty">${t.noTours}</p>`);
+    const q_ = $('q');
+    q_.addEventListener('input', () => { S.q = q_.value; S.listLimit = 100; const pos = q_.selectionStart; renderList(); const n = $('q'); n.focus(); n.setSelectionRange(pos, pos); });
+    el.querySelectorAll('th[data-k]').forEach((h) => h.addEventListener('click', () => { const k = h.dataset.k; if (S.sortKey === k) S.sortDir *= -1; else { S.sortKey = k; S.sortDir = k === 'name' || k === 'sport' ? 1 : -1; } renderList(); }));
+    el.querySelectorAll('td button[data-id]').forEach((b) => b.addEventListener('click', () => { const x = S.tours.find((y) => String(y.id) === b.dataset.id); if (x) focusTour(x); }));
+    const more = $('more'); if (more) more.addEventListener('click', () => { S.listLimit += 200; renderList(); });
+  }
+
+  /* ---------- Start und gelegentliches Aktualisieren ---------- */
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+  boot();
+  setInterval(() => { if (!document.hidden && S.entry && !$('head').hidden) load().catch(() => {}); }, 5 * 60 * 1000);
+  window.addEventListener('resize', () => { if (mapReady && S.tab === 'map') map.invalidateSize(); });
+})();
+</script>
+</body>
+</html>

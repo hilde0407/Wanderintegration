@@ -1,0 +1,139 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Komoot verbinden",
+        "description": "Melde dich mit deinem Komoot-Konto an. Die Integration nutzt die inoffizielle Komoot-Schnittstelle und liest nur deine aufgezeichneten Touren. Konten, die nur über Google oder Apple angelegt wurden, brauchen zuerst ein Passwort bei Komoot.",
+        "data": {
+          "email": "E-Mail",
+          "password": "Passwort"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Komoot erneut anmelden",
+        "description": "Das Passwort für {email} wurde abgelehnt. Bitte gib das aktuelle Passwort ein.",
+        "data": {
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "E-Mail oder Passwort falsch.",
+      "cannot_connect": "Komoot ist nicht erreichbar.",
+      "unknown": "Unerwarteter Fehler, siehe Protokoll."
+    },
+    "abort": {
+      "already_configured": "Dieses Komoot-Konto ist bereits eingerichtet.",
+      "reauth_successful": "Anmeldung erneuert.",
+      "unique_id_mismatch": "Das ist ein anderes Komoot-Konto."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Filter und Abruf",
+        "description": "Die Filter gelten für die Sensoren. Karte und Statistik in der Seitenleiste zeigen immer alle Touren und haben eigene Filter.",
+        "data": {
+          "sports": "Sportarten (leer = alle)",
+          "name_filter": "Namensfilter",
+          "scan_interval": "Abrufintervall",
+          "load_tracks": "Routen für die Karte laden"
+        },
+        "data_description": {
+          "name_filter": "Optional, je Sportart: sport:Text1|Text2, weitere Sportarten mit Komma. Beispiel: other:Amazfit|Hiking zählt Touren der Sportart other nur, wenn der Name einen der Texte enthält.",
+          "scan_interval": "Minuten zwischen zwei Abrufen."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_tour": {
+        "name": "Letzte Tour"
+      },
+      "last_tour_date": {
+        "name": "Datum der letzten Tour"
+      },
+      "last_tour_distance": {
+        "name": "Strecke der letzten Tour"
+      },
+      "last_tour_ascent": {
+        "name": "Aufstieg der letzten Tour"
+      },
+      "tours_month": {
+        "name": "Touren diesen Monat"
+      },
+      "tours_year": {
+        "name": "Touren dieses Jahr"
+      },
+      "tours_total": {
+        "name": "Touren gesamt"
+      },
+      "distance_month": {
+        "name": "Strecke diesen Monat"
+      },
+      "distance_year": {
+        "name": "Strecke dieses Jahr"
+      },
+      "distance_last_year": {
+        "name": "Strecke letztes Jahr"
+      },
+      "distance_total": {
+        "name": "Strecke gesamt"
+      },
+      "ascent_year": {
+        "name": "Aufstieg dieses Jahr"
+      },
+      "duration_year": {
+        "name": "Dauer dieses Jahr"
+      },
+      "tracks_loaded": {
+        "name": "Geladene Routen"
+      }
+    }
+  },
+  "services": {
+    "refresh": {
+      "name": "Jetzt abrufen",
+      "description": "Holt die Touren sofort von Komoot.",
+      "fields": {
+        "config_entry": {
+          "name": "Konto",
+          "description": "Leer = alle Konten."
+        }
+      }
+    },
+    "fetch_tracks": {
+      "name": "Routen laden",
+      "description": "Lädt fehlende Routen im Hintergrund nach.",
+      "fields": {
+        "config_entry": {
+          "name": "Konto",
+          "description": "Leer = alle Konten."
+        },
+        "force": {
+          "name": "Alle neu laden",
+          "description": "Auch bereits geladene Routen erneut holen."
+        }
+      }
+    },
+    "get_statistics": {
+      "name": "Statistik abrufen",
+      "description": "Liefert Summen gesamt, je Jahr, Monat und Sportart (alle Touren, unabhängig von den Sensorfiltern).",
+      "fields": {
+        "config_entry": {
+          "name": "Konto",
+          "description": "Leer = erstes Konto."
+        },
+        "year": {
+          "name": "Jahr",
+          "description": "Nur dieses Jahr."
+        },
+        "sport": {
+          "name": "Sportarten",
+          "description": "Schlüssel wie hike oder touringbicycle."
+        }
+      }
+    }
+  }
+}

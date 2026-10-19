@@ -1,0 +1,139 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect Komoot",
+        "description": "Sign in with your Komoot account. The integration uses Komoot's unofficial API and only reads your recorded tours. Accounts created only via Google or Apple need a password set at Komoot first.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in to Komoot again",
+        "description": "The password for {email} was rejected. Please enter the current password.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Wrong email or password.",
+      "cannot_connect": "Cannot reach Komoot.",
+      "unknown": "Unexpected error, see the log."
+    },
+    "abort": {
+      "already_configured": "This Komoot account is already set up.",
+      "reauth_successful": "Sign-in renewed.",
+      "unique_id_mismatch": "That is a different Komoot account."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Filters and polling",
+        "description": "The filters apply to the sensors. The map and statistics in the sidebar always show all tours and have their own filters.",
+        "data": {
+          "sports": "Sports (empty = all)",
+          "name_filter": "Name filter",
+          "scan_interval": "Polling interval",
+          "load_tracks": "Load routes for the map"
+        },
+        "data_description": {
+          "name_filter": "Optional, per sport: sport:text1|text2, more sports separated by comma. Example: other:Amazfit|Hiking counts tours of sport other only if the name contains one of the texts.",
+          "scan_interval": "Minutes between two polls."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_tour": {
+        "name": "Last tour"
+      },
+      "last_tour_date": {
+        "name": "Last tour date"
+      },
+      "last_tour_distance": {
+        "name": "Last tour distance"
+      },
+      "last_tour_ascent": {
+        "name": "Last tour ascent"
+      },
+      "tours_month": {
+        "name": "Tours this month"
+      },
+      "tours_year": {
+        "name": "Tours this year"
+      },
+      "tours_total": {
+        "name": "Tours total"
+      },
+      "distance_month": {
+        "name": "Distance this month"
+      },
+      "distance_year": {
+        "name": "Distance this year"
+      },
+      "distance_last_year": {
+        "name": "Distance last year"
+      },
+      "distance_total": {
+        "name": "Distance total"
+      },
+      "ascent_year": {
+        "name": "Ascent this year"
+      },
+      "duration_year": {
+        "name": "Duration this year"
+      },
+      "tracks_loaded": {
+        "name": "Loaded routes"
+      }
+    }
+  },
+  "services": {
+    "refresh": {
+      "name": "Refresh now",
+      "description": "Fetches the tours from Komoot right away.",
+      "fields": {
+        "config_entry": {
+          "name": "Account",
+          "description": "Empty = all accounts."
+        }
+      }
+    },
+    "fetch_tracks": {
+      "name": "Load routes",
+      "description": "Loads missing routes in the background.",
+      "fields": {
+        "config_entry": {
+          "name": "Account",
+          "description": "Empty = all accounts."
+        },
+        "force": {
+          "name": "Reload all",
+          "description": "Also fetch routes that are already loaded."
+        }
+      }
+    },
+    "get_statistics": {
+      "name": "Get statistics",
+      "description": "Returns totals overall, per year, month and sport (all tours, independent of the sensor filters).",
+      "fields": {
+        "config_entry": {
+          "name": "Account",
+          "description": "Empty = first account."
+        },
+        "year": {
+          "name": "Year",
+          "description": "Only this year."
+        },
+        "sport": {
+          "name": "Sports",
+          "description": "Keys such as hike or touringbicycle."
+        }
+      }
+    }
+  }
+}
