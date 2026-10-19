@@ -174,7 +174,8 @@
           noStart: 'ohne Startpunkt, nicht auf der Karte', routes: 'Routen', loadedOf: 'geladen', rest: 'der Rest folgt im Hintergrund', updated: 'Stand',
           loadErr: 'Daten konnten nicht geladen werden', noHa: 'Diese Seite muss innerhalb von Home Assistant geöffnet werden (Seitenleiste „Komoot“ oder Dashboard-Karte „Webseite“).',
           noEntry: 'Es ist noch kein Komoot-Konto eingerichtet. Unter Einstellungen → Geräte & Dienste → Integration hinzufügen → „Komoot Touren“.',
-          mapTopo: 'Topografisch (OpenTopoMap)', mapVector: 'Standard (OSM Vektorkarte)',
+          mapOsm: 'OpenStreetMap (OSMF, Standard)', mapTopo: 'Topografisch (OpenTopoMap)', mapVector: 'OpenStreetMap Vektorkarte (OSMF)',
+          osmBlocked: 'OSM-Kacheln wurden abgelehnt, es wird OpenTopoMap gezeigt.',
           noLib: 'Die Kartenbibliothek konnte nicht geladen werden. Die Karte braucht Internetzugang (unpkg.com).', months: ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'],
           sports: { hike: 'Wandern', mountaineering: 'Bergsteigen', snowshoe: 'Schneeschuh', jogging: 'Laufen', racebike: 'Rennrad', e_racebike: 'E-Rennrad', touringbicycle: 'Radtour', e_touringbicycle: 'E-Radtour',
                     citybike: 'Stadtrad', mtb: 'Mountainbike', mtb_easy: 'MTB leicht', mtb_advanced: 'MTB schwer', e_mtb: 'E-MTB', e_mtb_easy: 'E-MTB leicht', e_mtb_advanced: 'E-MTB schwer',
@@ -188,7 +189,8 @@
           noStart: 'without start point, not on the map', routes: 'Routes', loadedOf: 'loaded', rest: 'the rest follows in the background', updated: 'Updated',
           loadErr: 'Could not load data', noHa: 'This page has to be opened inside Home Assistant (sidebar “Komoot” or a webpage dashboard card).',
           noEntry: 'No Komoot account is set up yet. Settings → Devices & services → Add integration → “Komoot Touren”.',
-          mapTopo: 'Topographic (OpenTopoMap)', mapVector: 'Standard (OSM vector map)',
+          mapOsm: 'OpenStreetMap (OSMF, standard)', mapTopo: 'Topographic (OpenTopoMap)', mapVector: 'OpenStreetMap vector map (OSMF)',
+          osmBlocked: 'OSM tiles were rejected, showing OpenTopoMap instead.',
           noLib: 'The map library could not be loaded. The map needs internet access (unpkg.com).', months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
           sports: { hike: 'Hiking', mountaineering: 'Mountaineering', snowshoe: 'Snowshoeing', jogging: 'Running', racebike: 'Road cycling', e_racebike: 'E-road cycling', touringbicycle: 'Bike touring',
                     e_touringbicycle: 'E-bike touring', citybike: 'City bike', mtb: 'Mountain biking', mtb_easy: 'MTB easy', mtb_advanced: 'MTB advanced', e_mtb: 'E-MTB', e_mtb_easy: 'E-MTB easy',
@@ -350,7 +352,7 @@
   }
 
   /* ---------- Karte ---------- */
-  let map, cluster, lines, base, mapReady = false, lineById = {};
+  let map, cluster, lines, base, mapReady = false, lineById = {}, mapNote = '';
   const popup = (t) => `<div class="pop"><h3>${esc(t.name || '–')}</h3><p>${day(t.date)} · ${esc(sportName(t.sport))}</p>
     <dl><div><dt>${tr().distance}</dt><dd>${nf1.format(t.km)} km</dd></div><div><dt>${tr().duration}</dt><dd>${dur(t.min)}</dd></div><div><dt>${tr().ascent}</dt><dd>${nf0.format(t.up)} m</dd></div></dl>
     <a class="pop-link" href="https://www.komoot.com/tour/${encodeURIComponent(t.id)}" target="_blank" rel="noopener">${tr().openKomoot}</a></div>`;
@@ -363,31 +365,40 @@
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     const osm = '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
     map.setView([50.5, 10.5], 5); // Ansicht zuerst setzen, sonst wird die Vektorebene erst spaeter erzeugt
-    // Standard wie bisher: OpenTopoMap (Hoehenlinien, Wanderwege). Alternativ die Vektorkarte der OSMF.
+    // Kartenanbieter: OpenStreetMap Foundation (Standardkarte als Raster, Vektorkarte) und zusaetzlich OpenTopoMap
+    const osmRaster = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, referrerPolicy: 'strict-origin-when-cross-origin',
+      attribution: `© ${osm}-Mitwirkende · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener">Fix the map</a>` });
     const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, subdomains: 'abc',
       attribution: `Kartendaten © ${osm}, SRTM | © <a href="https://opentopomap.org" target="_blank" rel="noopener">OpenTopoMap</a> (CC-BY-SA)` });
-    const layers = { [tr().mapTopo]: topo };
+    const layers = { [tr().mapOsm]: osmRaster };
     let vector = null;
     try {
       if (window.maplibregl && L.maplibreGL) {
         const dark = document.documentElement.classList.contains('dark');
         const style = new URL(dark ? 'style-dunkel.json' : 'style-hell.json', window.location.href).href;
         vector = L.maplibreGL({ style, interactive: false,
-          attribution: `© ${osm} · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener">Fix the map</a>` });
+          attribution: `© ${osm}-Mitwirkende · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener">Fix the map</a>` });
         layers[tr().mapVector] = vector;
       }
     } catch (e) { vector = null; }
-    const wantVector = vector && store.get('basemap') === 'vector';
-    (wantVector ? vector : topo).addTo(map);
-    document.documentElement.classList.toggle('raster', !wantVector);
-    if (vector) {
-      L.control.layers(layers, null, { position: 'topright', collapsed: true }).addTo(map);
-      map.on('baselayerchange', (e) => {
-        const isVector = e.layer === vector;
-        document.documentElement.classList.toggle('raster', !isVector);
-        store.set('basemap', isVector ? 'vector' : 'topo');
-      });
-    }
+    layers[tr().mapTopo] = topo;
+    const saved = store.get('basemap');
+    const start = saved === 'vector' && vector ? vector : saved === 'topo' ? topo : osmRaster;
+    start.addTo(map);
+    document.documentElement.classList.toggle('raster', start !== vector);
+    L.control.layers(layers, null, { position: 'topright', collapsed: true }).addTo(map);
+    map.on('baselayerchange', (e) => {
+      document.documentElement.classList.toggle('raster', e.layer !== vector);
+      store.set('basemap', e.layer === vector ? 'vector' : e.layer === topo ? 'topo' : 'osm');
+    });
+    // Blockiert OSM die Kacheln (z. B. wegen fehlender Herkunftsangabe), automatisch auf OpenTopoMap wechseln
+    let tileOk = 0, tileBad = 0;
+    osmRaster.on('tileload', () => { tileOk++; });
+    osmRaster.on('tileerror', () => {
+      if (!tileOk && ++tileBad === 6 && map.hasLayer(osmRaster)) {
+        map.removeLayer(osmRaster); topo.addTo(map); mapNote = tr().osmBlocked; renderMap();
+      }
+    });
     cluster = L.markerClusterGroup({ maxClusterRadius: 36, showCoverageOnHover: false, iconCreateFunction: (c) => L.divIcon({ html: `<span>${c.getChildCount()}</span>`, className: 'cl', iconSize: [34, 34] }) });
     map.addLayer(cluster);
     lines = L.layerGroup().addTo(map);
@@ -424,6 +435,7 @@
     const noStart = tours.length - located.length;
     $('sum').innerHTML = `<div><b>${nf0.format(tours.length)}</b><span>${tr().tours}</span></div><div><b>${nf0.format(km)}</b><span>${tr().km}</span></div><div><b>${nf0.format(up)}</b><span>${tr().up}</span></div>`
       + (noStart ? `<p>${noStart} ${tr().noStart}</p>` : '')
+      + (mapNote ? `<p>${mapNote}</p>` : '')
       + (S.meta.tracks_loaded < S.meta.tracks_total ? `<p>${tr().routes}: ${nf0.format(S.meta.tracks_loaded)} / ${nf0.format(S.meta.tracks_total)} ${tr().loadedOf}, ${tr().rest}</p>` : '')
       ;
     fetchTracks(withTrack);

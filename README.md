@@ -5,7 +5,7 @@ Liest deine **aufgezeichneten Komoot-Touren aller Sportarten** und stellt sie in
 - **Sensoren** für letzte Tour, Touren und Kilometer (Monat, Jahr, Vorjahr, gesamt), Höhenmeter und Dauer
 - **Filter** nach Sportart und Namen (für die Sensoren, in den Optionen einstellbar)
 - **Seitenleisten-Eintrag „Komoot“** mit
-  - **Karte** (Startpunkte und Routen, Vektorkarte der OpenStreetMap Foundation, farbig nach Sportart),
+  - **Karte** (Startpunkte und Routen, Kartenanbieter OpenStreetMap Foundation, wahlweise Standardkarte, Vektorkarte oder OpenTopoMap, farbig nach Sportart),
   - **Statistik** mit Jahres- und Monatsbalken, Jahresverlauf im Vergleich zu früheren Jahren, Auswertung nach Sportart und Bestwerten,
   - **Tourenliste** mit Suche und Sortierung,
   - Filterleiste für **Jahr** und **Sportarten** (mehrere gleichzeitig wählbar)
@@ -58,7 +58,7 @@ Die Seite lässt sich auch als Karte *Webseite* einbinden: URL `/komoot_tours_st
 - E-Mail und Passwort liegen wie bei jeder Integration in der Konfiguration von Home Assistant (und damit in Sicherungen).
 - Touren und Routen werden nur über **authentifizierte** Endpunkte (`/api/komoot_tours/...`) ausgeliefert. Angemeldete Benutzer von Home Assistant können sie sehen, auch Nicht-Administratoren.
 - Routen enthalten Wohn- und Aufenthaltsorte. Teile Sicherungen und Screenshots entsprechend vorsichtig.
-- Die Karte lädt Bibliotheken von `unpkg.com`, Kartenkacheln von `vector.openstreetmap.org` und Schriften und Symbole von `tiles.versatiles.org` direkt im Browser. Fallback: OpenTopoMap. Die Kartennutzung unterliegt der [Nutzungsrichtlinie der OSMF](https://operations.osmfoundation.org/policies/vector/).
+- Die Karte lädt Bibliotheken von `unpkg.com`, Kartenkacheln von `tile.openstreetmap.org` (Standard), `vector.openstreetmap.org` und `tile.opentopomap.org` sowie Schriften und Symbole von `tiles.versatiles.org` direkt im Browser. Lehnt OSM die Kacheln ab, wechselt die Karte automatisch zu OpenTopoMap. Die Kartennutzung unterliegt den Richtlinien der OSMF ([Raster](https://operations.osmfoundation.org/policies/tiles/), [Vektor](https://operations.osmfoundation.org/policies/vector/)).
 
 ## Von dem Skript mit `command_line` umsteigen
 Die Einträge unter `command_line:` für `komoot_tours.py`, den Ordner `/config/komoot/` und `/config/www/komoot/` kannst du nach der Einrichtung entfernen. Dashboard-Karten, die `sensor.komoot_*` des Skripts nutzten, müssen auf die neuen Sensoren umgestellt werden.
