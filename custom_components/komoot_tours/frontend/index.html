@@ -366,12 +366,13 @@
       base = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, subdomains: 'abc',
         attribution: 'Kartendaten © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>, SRTM | © <a href="https://opentopomap.org" target="_blank" rel="noopener">OpenTopoMap</a> (CC-BY-SA)' }).addTo(map);
     };
+    map.setView([50.5, 10.5], 5); // Ansicht zuerst setzen, sonst wird die Vektorebene erst spaeter erzeugt
     try {
       if (window.maplibregl && L.maplibreGL) {
         const dark = document.documentElement.classList.contains('dark');
         const style = new URL(dark ? 'style-dunkel.json' : 'style-hell.json', window.location.href).href;
         base = L.maplibreGL({ style, attribution: attr, interactive: false }).addTo(map);
-        let errs = 0; base.getMaplibreMap().on('error', () => { if (++errs === 5) raster(); });
+        let errs = 0; const gl = base.getMaplibreMap(); if (gl) gl.on('error', () => { if (++errs === 5) raster(); }); else raster();
       } else raster();
     } catch (e) { raster(); }
     cluster = L.markerClusterGroup({ maxClusterRadius: 36, showCoverageOnHover: false, iconCreateFunction: (c) => L.divIcon({ html: `<span>${c.getChildCount()}</span>`, className: 'cl', iconSize: [34, 34] }) });

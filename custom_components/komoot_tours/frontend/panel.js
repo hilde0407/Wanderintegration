@@ -8,10 +8,10 @@ class KomootToursPanel extends HTMLElement {
     if (this._frame || !this._panel) return;
     const root = this.attachShadow ? (this.shadowRoot || this.attachShadow({ mode: 'open' })) : this;
     root.innerHTML = `<style>
-      :host { display: flex; flex-direction: column; height: 100%; background: var(--primary-background-color); }
+      :host { display: flex; flex-direction: column; width: 100%; height: 100vh; min-height: 400px; background: var(--primary-background-color); }
       .bar { display: none; align-items: center; height: 56px; padding: 0 4px; flex: none; background: var(--app-header-background-color, var(--primary-color)); color: var(--app-header-text-color, #fff); }
       .bar span { font-size: 20px; margin-left: 4px; }
-      iframe { flex: 1; width: 100%; border: 0; display: block; }
+      iframe { flex: 1 1 auto; width: 100%; min-height: 0; border: 0; display: block; }
     </style>
     <div class="bar"><ha-menu-button></ha-menu-button><span>Komoot</span></div>
     <iframe title="Komoot"></iframe>`;
