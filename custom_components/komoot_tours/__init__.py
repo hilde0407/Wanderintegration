@@ -15,6 +15,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady,
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.loader import IntegrationNotFound, async_get_integration
 
 from .api import KomootAuthError, KomootClient, KomootConnectionError
 from .const import DOMAIN, PANEL_URL_PATH, STATIC_URL
@@ -34,12 +35,11 @@ SERVICE_STATISTICS = "get_statistics"
 _FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
-def _version() -> str:
+async def _version(hass: HomeAssistant) -> str:
+    """Version aus dem Manifest, ohne die Ereignisschleife zu blockieren."""
     try:
-        import json  # noqa: PLC0415
-
-        return json.loads((Path(__file__).parent / "manifest.json").read_text())["version"]
-    except (OSError, ValueError, KeyError):
+        return str((await async_get_integration(hass, DOMAIN)).version or "0")
+    except IntegrationNotFound:
         return "0"
 
 
@@ -161,7 +161,7 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
         _register_views(hass)
         state["static"] = True
     if not state.get("panel"):
-        version = _version()
+        version = await _version(hass)
         await panel_custom.async_register_panel(
             hass,
             webcomponent_name="komoot-tours-panel",
